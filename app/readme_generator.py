@@ -1,59 +1,103 @@
 import os
-
+import tempfile
 from app.project_crawler import get_project_path, read_project_files
-from app.agents.agent_reviewer import agente_revisor_codigo
-from app.agents.tech_explainer import tech_explainer
-from app.agents.readme_proposer import readme_proposer
-from app.agents.readme_refiner import readme_refiner
+from app.agents.create_agent import create_agent
+
+def generate_codebase_input(project_files: dict[str, str]) -> str:
+    input_text = "### Project files:\n"
+    for path, content in project_files.items():
+        input_text += f"\n\n#### {path}\n```\n{content[:3000]}\n```"
+    return input_text
 
 def main():
-    """
-    Função principal para orquestrar a geração do README com IA (simulado).
-    """
-    print("🚀 Iniciando o Gerador de README com IA!")
+    print("🚀 Starting AI README Generator!")
 
-    # 1. Obter caminho do projeto
-    caminho_do_projeto = get_project_path()
-    nome_base_projeto = os.path.basename(caminho_do_projeto)
+    # 1. Get project path
+    project_path = get_project_path()
+    project_basename = os.path.basename(project_path)
 
-    # 2. Agente 1: Ler e revisar a base de código
-    print("====== Agente 1: Ler e revisar a base de código ======")
-    arquivos_lidos = read_project_files(caminho_do_projeto)
-    if not arquivos_lidos:
-        print("\nNenhum arquivo relevante foi lido. Encerrando o processo.")
-        return        
-    analise = agente_revisor_codigo(arquivos_lidos)
-    print("Resumo da análise:\n", analise)
+    # 2. Agent 1: Read and review the codebase
+    print("====== Agent 1: Read and review the codebase ======")
+    read_files = read_project_files(project_path)
+    if not read_files:
+        print("\nNo relevant files were read. Exiting process.")
+        return
+
+    input_text = generate_codebase_input(read_files)
+    analysis = create_agent(
+        name="code_reviewer_agent",
+        model="gemini-2.0-flash",
+        instruction_path="./instructions/reviewer.txt",
+        textual_input=input_text,
+        description="Agent that reviews the codebase and provides a technical overview"
+    )
+    print("Analysis summary:\n", analysis)
     print("\n")
 
-    # 3. Agente 2: Explicar tecnicamente
-    print("====== Agente 2: Explicar tecnicamente ======")
-    explicacao_tecnica_gerada = tech_explainer(analise)
-    print("Resumo da explicação técnica:\n", explicacao_tecnica_gerada)
+    # 3. Agent 2: Technical explainer
+    print("====== Agent 2: Technical explainer ======")
+    technical_explanation = create_agent(
+        name="tech_explainer_agent",
+        model="gemini-2.0-flash",
+        instruction_path="./instructions/explainer.txt",
+        textual_input=analysis,
+        description="Agent that explains the codebase in technical terms"
+    )
+    print("Technical explanation summary:\n", technical_explanation)
 
-    # # 4. Agente 3: Propor README
-    print("====== Agente 3: Propor README ======")
-    project_name = os.path.basename(caminho_do_projeto.rstrip("/"))
-    readme_draft = readme_proposer(explicacao_tecnica_gerada, project_name=project_name)
-    print("\nRascunho do README:\n", readme_draft)
+    
+    # 4. Agent 3: Propose README
+    print("====== Agent 3: Propose README ======")
 
-    # # 5. Agente 4: Refinar README
-    print("====== Agente 4: Refinar README ======")
-    readme_final = readme_refiner(readme_draft)
-    print("\n--- ✅ README Final Gerado ---\n")
-    print(readme_final)    
+    # Read and customize the instruction file
+    with open("./instructions/readme_proposer.txt", encoding="utf-8") as f:
+        instruction_content = f.read()
 
-    # 6. Salvar o README gerado
-    print("====== Salvar o README gerado ======")
-    caminho_readme_gerado = os.path.join(caminho_do_projeto, "README_gerado_ia.md")
+    # Replace the placeholder with the actual project name
+    instruction_content = instruction_content.replace("{+project_name+}", project_basename).replace("{project_name}", project_basename)
+
+    # Create a temporary file for the customized instruction
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as temp_instruction_file:
+        temp_instruction_file.write(instruction_content)
+        temp_instruction_path = temp_instruction_file.name
+
+    # Use the temp file path in create_agent (no need to pass context anymore)
+    readme_draft = create_agent(
+        name="readme_proposer_agent",
+        model="gemini-2.0-flash",
+        instruction_path=temp_instruction_path,
+        textual_input=technical_explanation,
+        description="Agent that drafts a README for the project"
+    )
+
+    # Clean up the temp file after use
+    os.remove(temp_instruction_path)
+
+    print("\nREADME draft:\n", readme_draft)
+
+    # 5. Agent 4: Refine README
+    print("====== Agent 4: Refine README ======")
+    readme_final = create_agent(
+        name="readme_refiner_agent",
+        model="gemini-2.0-flash",
+        instruction_path="./instructions/readme_refiner.txt",
+        textual_input=readme_draft,
+        description="Agent that refines the README draft"
+    )
+    print("\n--- ✅ Final README generated ---\n")
+    print(readme_final)
+
+    # 6. Save the generated README
+    print("====== Saving generated README ======")
+    readme_output_path = os.path.join(project_path, "README_generated_ai.md")
     try:
-        with open(caminho_readme_gerado, 'w', encoding='utf-8') as f:
+        with open(readme_output_path, 'w', encoding='utf-8') as f:
             f.write(readme_final)
-        print(f"\n💾 README salvo em: {caminho_readme_gerado}")
+        print(f"\n💾 README saved to: {readme_output_path}")
     except Exception as e:
-        print(f"\n⚠️ Erro ao salvar o README: {e}")
+        print(f"\n⚠️ Error while saving the README: {e}")
 
-    print("\n🎉 Processo concluído!")
+    print("\n🎉 Process completed!")
 
 
 if __name__ == "__main__":
