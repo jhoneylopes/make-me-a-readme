@@ -45,7 +45,6 @@ def main():
     )
     print("Technical explanation summary:\n", technical_explanation)
 
-    
     # 4. Agent 3: Propose README
     print("====== Agent 3: Propose README ======")
 

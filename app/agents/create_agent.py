@@ -7,7 +7,6 @@ def create_agent(
     instruction_path: str,
     textual_input: str,
     description: str = "",
-    context: dict = None,
 ) -> str:
     """
     Generic function to run any agent based on instructions from a file.
@@ -37,4 +36,4 @@ def create_agent(
         description=description,
     )
 
-    return call_agent(agent, textual_input, context=context)
+    return call_agent(agent, textual_input)

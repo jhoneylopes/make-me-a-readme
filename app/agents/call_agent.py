@@ -8,15 +8,24 @@ from google.genai import types
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from dotenv import load_dotenv
 
-# Ignora warnings
 warnings.filterwarnings("ignore")
 
-# Configuração da API
-client = genai.Client()
-os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+# 1. Load environment variables from .env
+load_dotenv()
 
-def call_agent(agent: Agent, message_text: str, context: dict = None) -> str:
+# 2. Ensure GOOGLE_API_KEY is set
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    raise RuntimeError("GOOGLE_API_KEY not set in .env or environment variables.")
+
+os.environ["GOOGLE_API_KEY"] = api_key
+
+# 3. Now create the client
+client = genai.Client()
+
+def call_agent(agent: Agent, message_text: str) -> str:
     session_service = InMemorySessionService()
     session = session_service.create_session(app_name=agent.name, user_id="user1", session_id="session1")
     runner = Runner(agent=agent, app_name=agent.name, session_service=session_service)
@@ -27,9 +36,7 @@ def call_agent(agent: Agent, message_text: str, context: dict = None) -> str:
         "user_id": "user1",
         "session_id": "session1",
         "new_message": content
-    }
-    if context is not None:
-        run_args["context"] = context
+    }    
 
     for event in runner.run(**run_args):
         if event.is_final_response():

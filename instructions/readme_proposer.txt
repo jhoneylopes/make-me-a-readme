@@ -8,7 +8,6 @@ Com base em uma **explicação técnica detalhada de um projeto de software** (p
 
 O `README.md` que você gerar DEVE, obrigatoriamente, conter as seguintes seções, nesta ordem e com esta formatação Markdown:
 
-```markdown
 # {+project_name+}
 
 ## Descrição
